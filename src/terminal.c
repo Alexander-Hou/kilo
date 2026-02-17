@@ -1,11 +1,11 @@
 #include "kilo.h"
 void enableRawMode(void) {
-    if(tcgetattr(STDIN_FILENO, &orignal_termios) == -1) {
+    if(tcgetattr(STDIN_FILENO, &editor.orignal_termios) == -1) {
         die("tcgetattr"); // 获取当前终端属性
     }
     atexit(disableRawMode); // 注册退出函数，确保程序退出时恢复终端属性
 
-    struct termios rawmode=orignal_termios; // 复制原始终端属性
+    struct termios rawmode=editor.orignal_termios; // 复制原始终端属性
     rawmode.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON); // 关闭输入处理功能
     rawmode.c_oflag &= ~(OPOST); // 关闭输出处理功能
     rawmode.c_lflag &= ~(ECHO | ICANON | ISIG | IEXTEN); // 关闭回显、规范模式、中断信号和扩展功能
@@ -19,12 +19,14 @@ void enableRawMode(void) {
 }
 
 void disableRawMode(void){
-    if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &orignal_termios) == -1) {
+    if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &editor.orignal_termios) == -1) {
         die("tcsetattr"); // 恢复原始终端属性
     }
 }
 
 void die(const char *str){
+    write(STDOUT_FILENO, "\x1b[2J", 4); // 清屏
+    write(STDOUT_FILENO, "\x1b[H", 3); // 将光标移动到左上角
     perror(str); // 输出错误信息
     exit(1); // 退出程序
 }
