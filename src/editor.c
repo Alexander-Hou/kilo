@@ -56,6 +56,31 @@ int editorReadKey(void) {
     return c; // 返回读取到的键盘输入
 }
 
+void editorMoveCursor(int key) {
+    switch(key) {
+        case ARROW_UP:
+            if(editor.cursor_y != 0) {
+                editor.cursor_y--; 
+            }
+            break;
+        case ARROW_DOWN:
+            if(editor.cursor_y != editor.screenrows - 1) {
+                editor.cursor_y++; 
+            }
+            break;
+        case ARROW_LEFT:
+            if(editor.cursor_x != 0) {
+                editor.cursor_x--; 
+            }
+            break;
+        case ARROW_RIGHT:
+            if(editor.cursor_x != editor.screencols - 1) {
+                editor.cursor_x++; 
+            }
+            break;
+    }
+}
+
 void editorProcessKeypress(void) {
     int c = editorReadKey(); // 读取一个键盘输入
     switch(c) {
@@ -89,42 +114,13 @@ void editorProcessKeypress(void) {
         }
 }
 
-void editorRefreshScreen(void) {
-    struct apbuf ab = {NULL, 0}; // 定义一个动态字符串缓冲区
-    bufferAppend(&ab, "\x1b[?25l", 6); // 隐藏光标
-    bufferAppend(&ab, "\x1b[H", 3); // 将光标移动到左上角
-    editorDrawRows(&ab); // 绘制屏幕内容
-    char buf[32];
-    snprintf(buf, sizeof(buf), "\x1b[%d;%dH", editor.cursor_y + 1, editor.cursor_x + 1); // 将光标移动到指定位置
-    bufferAppend(&ab, buf, strlen(buf)); // 将光标位置字符串追加到动态字符串缓冲区
-    bufferAppend(&ab, "\x1b[?25h", 6); // 显示光标
-    write(STDOUT_FILENO, ab.str, ab.len); // 将缓冲区内容写入标准输出
-    bufferFree(&ab); // 释放缓冲区内容
-}
-
-void editorDrawRows(struct apbuf *ab) {
-    int y;
-    for(y = 0; y < editor.screenrows; y++) {
-        if(y==editor.screenrows/3) {
-            char welcome[81];   // 定义欢迎信息字符串
-            int welcomelen = snprintf(welcome, sizeof(welcome), "Kilo editor");  // 格式化欢迎信息字符串
-            if(welcomelen > editor.screencols) welcomelen = editor.screencols;  // 如果欢迎信息长度超过屏幕宽度，则截断
-            int padding = (editor.screencols - welcomelen) / 2;  // 计算欢迎信息的左右填充空格数
-            if(padding > 0) {
-                bufferAppend(ab, "~", 1);
-                padding--;
-            }  // 在欢迎信息前面显示一个波浪符，同时减少一个填充空格
-            while(padding--) {
-                bufferAppend(ab, " ", 1);
-            }
-            bufferAppend(ab, welcome, welcomelen);  // 显示欢迎信息
-        } else {
-            bufferAppend(ab, "~", 1); // 在每行显示一个波浪符
-        }
-        bufferAppend(ab, "\x1b[K", 3); // 清除行尾内容
-        if(y<editor.screenrows-1) {
-            bufferAppend(ab, "\r\n", 2); // 换行
-        }
+void editorInitConfig(void) {
+    editor.row = NULL; // 初始化行文本内容指针
+    editor.numrows = 0;  // 初始化文本行数
+    editor.cursor_x = 0; // 初始化光标x坐标
+    editor.cursor_y = 0; // 初始化光标y坐标
+    if(getWindowSize(&editor.screenrows, &editor.screencols) == -1) {
+        die("getWindowSize"); // 获取窗口大小失败
     }
 }
 
@@ -139,33 +135,76 @@ int getWindowSize(int *rows, int *cols) {
     }
 }
 
-void editorInitConfig(void) {
-    if(getWindowSize(&editor.screenrows, &editor.screencols) == -1) {
-        die("getWindowSize"); // 获取窗口大小失败
+void editorDrawRows(struct apbuf *ab) {
+    int y;
+    for(y = 0; y < editor.screenrows; y++) {
+        if(y >= editor.numrows) {
+            if(editor.numrows == 0 && y == editor.screenrows/3) {
+                char welcome[81];   // 定义欢迎信息字符串
+                int welcomelen = snprintf(welcome, sizeof(welcome), "Kilo editor");  // 格式化欢迎信息字符串
+                if(welcomelen > editor.screencols) welcomelen = editor.screencols;  // 如果欢迎信息长度超过屏幕宽度，则截断
+                int padding = (editor.screencols - welcomelen) / 2;  // 计算欢迎信息的左右填充空格数
+                if(padding > 0) {
+                    bufferAppend(ab, "~", 1);
+                    padding--;
+                }  // 在欢迎信息前面显示一个波浪符，同时减少一个填充空格
+                while(padding--) {
+                    bufferAppend(ab, " ", 1);
+                }
+                bufferAppend(ab, welcome, welcomelen);  // 显示欢迎信息
+            } else {
+                bufferAppend(ab, "~", 1); // 在每行显示一个波浪符
+            }
+        } else {
+            int len = editor.row[y].size; // 获取行文本长度
+            if(len > editor.screencols) len = editor.screencols; // 如果行文本长度超过屏幕宽度，则截断
+            bufferAppend(ab, editor.row[y].str, len); // 显示行文本内容
+        }
+        bufferAppend(ab, "\x1b[K", 3); // 清除行尾内容
+        if(y<editor.screenrows-1) {
+            bufferAppend(ab, "\r\n", 2); // 换行
+        }
     }
 }
 
-void editorMoveCursor(int key) {
-    switch(key) {
-        case ARROW_UP:
-            if(editor.cursor_y != 0) {
-                editor.cursor_y--; 
-            }
-            break;
-        case ARROW_DOWN:
-            if(editor.cursor_y != editor.screenrows - 1) {
-                editor.cursor_y++; 
-            }
-            break;
-        case ARROW_LEFT:
-            if(editor.cursor_x != 0) {
-                editor.cursor_x--; 
-            }
-            break;
-        case ARROW_RIGHT:
-            if(editor.cursor_x != editor.screencols - 1) {
-                editor.cursor_x++; 
-            }
-            break;
+void editorRefreshScreen(void) {
+    struct apbuf ab = {NULL, 0}; // 定义一个动态字符串缓冲区
+    bufferAppend(&ab, "\x1b[?25l", 6); // 隐藏光标
+    bufferAppend(&ab, "\x1b[H", 3); // 将光标移动到左上角
+    editorDrawRows(&ab); // 绘制屏幕内容
+    char buf[32];
+    snprintf(buf, sizeof(buf), "\x1b[%d;%dH", editor.cursor_y + 1, editor.cursor_x + 1); // 将光标移动到指定位置
+    bufferAppend(&ab, buf, strlen(buf)); // 将光标位置字符串追加到动态字符串缓冲区
+    bufferAppend(&ab, "\x1b[?25h", 6); // 显示光标
+    write(STDOUT_FILENO, ab.str, ab.len); // 将缓冲区内容写入标准输出
+    bufferFree(&ab); // 释放缓冲区内容
+}
+
+void editorAppendRow(char *s, size_t len) {
+    editor.row = realloc(editor.row, sizeof(row_text) * (editor.numrows + 1)); // 为行文本内容重新分配内存
+    if(editor.row == NULL) {
+        die("realloc"); // 内存分配失败
     }
+    int row_index = editor.numrows; // 获取当前行索引
+    editor.row[row_index].size = len; // 设置行文本长度
+    editor.row[row_index].str = malloc(len + 1); // 为行文本内容分配内存
+    if(editor.row[row_index].str == NULL) {
+        die("malloc"); // 内存分配失败
+    }
+    memcpy(editor.row[row_index].str, s, len); // 将行文本内容复制到编辑器配置的行文本内容中
+    editor.row[row_index].str[len] = '\0'; // 在行文本内容末尾添加字符串结束符
+    editor.numrows++; // 增加文本行数
+}
+
+void editorOpenFile(char *filename) {
+    FILE *fp= fopen(filename, "r"); // 打开文件
+    if(fp == NULL) {
+        die("fopen"); // 打开文件失败
+    }
+    char line[1024]; // 定义一行文本内容
+    while(fgets(line, sizeof(line), fp) != NULL) {
+        int linelen = strcspn(line, "\r\n"); // 获取行文本长度，去除行末的换行符
+        editorAppendRow(line, linelen); // 向编辑器配置中追加一行文本内容
+    }
+    fclose(fp); // 关闭文件
 }

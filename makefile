@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -pedantic -std=c99 -Iinclude
+CFLAGS = -Wall -Wextra -pedantic -std=c99 -Iinclude -g
 SRC_DIR = src
 BUILD_DIR = build
 TARGET = kilo
