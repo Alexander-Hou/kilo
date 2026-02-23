@@ -12,10 +12,13 @@
 #include<sys/types.h>
 
 #define CTRL_KEY(k) ((k) & 0x1f) // 将字符转换为控制键
+#define TAB_STOP 8 // 定义制表符停止位置
 
 typedef struct row_text{
     int size; // 行文本长度
     char *str; // 行文本内容
+    int rsize; // 行渲染文本长度
+    char *render; // 行渲染文本内容
 } row_text; // 定义结构体表示一行文本
 
 struct editorConfig {
@@ -24,6 +27,8 @@ struct editorConfig {
     int screencols; // 屏幕列数
     int cursor_x; // 光标x坐标
     int cursor_y; // 光标y坐标
+    int row_offset; // 行偏移量
+    int cols_offset; // 列偏移量
     int numrows; // 文本行数
     row_text *row; // 文本行内容
 };
@@ -66,6 +71,7 @@ void editorDrawRows(struct apbuf *ab); // 绘制屏幕内容
 void editorRefreshScreen(void); // 刷新屏幕显示
 void editorOpenFile(char *filename); // 打开文件并读取内容
 void editorAppendRow(char *s, size_t len); // 向编辑器配置中追加一行文本内容
-
+void editorScorllScreen(void); // 根据光标位置调整行偏移量
+void editorUpdateRow(row_text *row); // 更新行渲染文本内容
 
 #endif
